@@ -9,6 +9,9 @@ class NumberSpider(scrapy.Spider):
 
     def open_spider(self, spider):
         """Open database connection when the spider starts."""
+        self.connection = None
+        self.cursor = None
+
         try:
             # Attempt to connect to the database
             self.logger.info("Opening database connection...")
