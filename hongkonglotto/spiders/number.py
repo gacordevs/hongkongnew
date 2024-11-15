@@ -9,9 +9,6 @@ class NumberSpider(scrapy.Spider):
 
     def open_spider(self, spider):
         """Open database connection when the spider starts."""
-        self.connection = None
-        self.cursor = None
-
         try:
             # Attempt to connect to the database
             self.logger.info("Opening database connection...")
@@ -53,6 +50,11 @@ class NumberSpider(scrapy.Spider):
         second_place_numbers = []
         third_place_numbers = []
 
+        # Check if the database connection exists
+        if not hasattr(self, 'connection') or self.connection is None:
+            self.logger.error("Database connection not established.")
+            return  # Stop execution if the connection is not established
+
         # Extract data for first, second, and third places
         for first in response.css('div[data-id="2526:6087"]'):
             first_place = first.css('div.frame-42234')
@@ -76,11 +78,8 @@ class NumberSpider(scrapy.Spider):
         current_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         # Save to DB
-        if self.connection and self.cursor:
-            self.save_to_db(current_date, first_place_numbers, second_place_numbers, third_place_numbers)
-        else:
-            self.logger.error("Cannot save data to DB: Connection or cursor is not initialized.")
-        
+        self.save_to_db(current_date, first_place_numbers, second_place_numbers, third_place_numbers)
+
         yield {
             'keluaran': {
                 'date': current_date,
@@ -114,6 +113,6 @@ class NumberSpider(scrapy.Spider):
 
     def close_spider(self, spider):
         """Close the database connection when the spider finishes."""
-        if self.connection:
+        if hasattr(self, 'connection') and self.connection:
             self.connection.close()
             self.logger.info("Database connection closed.")
