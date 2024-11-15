@@ -7,11 +7,6 @@ class NumberSpider(scrapy.Spider):
     allowed_domains = ['hongkonglotto.com']
     start_urls = ['https://hongkonglotto.com/update-loadball']
 
-    def __init__(self, *args, **kwargs):
-        super(NumberSpider, self).__init__(*args, **kwargs)  # Call the parent class' __init__
-        self.connection = None
-        self.cursor = None
-
     def open_spider(self, spider):
         """Open database connection when the spider starts."""
         try:
