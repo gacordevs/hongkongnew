@@ -47,6 +47,11 @@ class NumberSpider(scrapy.Spider):
         except Exception as e:
             logging.error(f"Error setting up database connection: {e}")
             raise
+        
+        if not hasattr(self, 'cursor'):
+            logging.error("Cursor initialization failed.")
+        else:
+            logging.info("Cursor initialized successfully.")
 
     def parse(self, response):
         logging.info("Parsing response...")
