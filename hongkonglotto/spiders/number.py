@@ -14,27 +14,31 @@ class NumberSpider(scrapy.Spider):
 
     def open_spider(self, spider):
         """Open database connection when the spider starts."""
-        self.connection = pymysql.connect(
-            host='localhost',  # e.g., 'localhost' or IP address of the MySQL server
-            user='public_admin',  # Your MySQL username
-            password='Publicadmin123#',  # Your MySQL password
-            database='hongkong',  # The name of the database
-            charset='utf8mb4',
-            cursorclass=pymysql.cursors.DictCursor
-        )
-        self.cursor = self.connection.cursor()
-
-        # Create the table if it doesn't exist
-        self.cursor.execute(''' 
-            CREATE TABLE IF NOT EXISTS keluaran (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                date DATETIME,
-                first TEXT,
-                second TEXT,
-                third TEXT
+        try:
+            self.connection = pymysql.connect(
+                host='localhost',  # e.g., 'localhost' or IP address of the MySQL server
+                user='public_admin',  # Your MySQL username
+                password='Publicadmin123#',  # Your MySQL password
+                database='hongkong',  # The name of the database
+                charset='utf8mb4',
+                cursorclass=pymysql.cursors.DictCursor
             )
-        ''')
-        self.connection.commit()
+            self.cursor = self.connection.cursor()
+
+            # Create the table if it doesn't exist
+            self.cursor.execute(''' 
+                CREATE TABLE IF NOT EXISTS keluaran (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    date DATETIME,
+                    first TEXT,
+                    second TEXT,
+                    third TEXT
+                )
+            ''')
+            self.connection.commit()
+            self.logger.info("Database connection established successfully.")
+        except Exception as e:
+            self.logger.error(f"Failed to open database connection: {e}")
 
     def parse(self, response):
         """Parse the response and extract the numbers."""
@@ -78,18 +82,27 @@ class NumberSpider(scrapy.Spider):
 
     def save_to_db(self, date, first, second, third):
         """Save scraped data to the MySQL database."""
+        if self.connection is None or self.cursor is None:
+            self.logger.error("Database connection or cursor is not initialized.")
+            return  # Exit early if the connection is not initialized
+        
         first_str = ' '.join([f.replace(",", "") for f in first])
         second_str = ' '.join([s.replace(",", "") for s in second])
         third_str = ' '.join([t.replace(",", "") for t in third])
 
-        # Insert the data into the MySQL table
-        self.cursor.execute(''' 
-            INSERT INTO keluaran (date, first, second, third)
-            VALUES (%s, %s, %s, %s)
-        ''', (date, first_str, second_str, third_str))
-        self.connection.commit()
+        try:
+            # Insert the data into the MySQL table
+            self.cursor.execute(''' 
+                INSERT INTO keluaran (date, first, second, third)
+                VALUES (%s, %s, %s, %s)
+            ''', (date, first_str, second_str, third_str))
+            self.connection.commit()
+            self.logger.info(f"Data inserted successfully for date {date}")
+        except Exception as e:
+            self.logger.error(f"Failed to insert data into database: {e}")
 
     def close_spider(self, spider):
         """Close the database connection when the spider finishes."""
         if self.connection:
             self.connection.close()
+            self.logger.info("Database connection closed.")
