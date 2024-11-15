@@ -1,7 +1,5 @@
 import scrapy
 import pymysql
-import logging
-import os
 from datetime import datetime
 
 class NumberSpider(scrapy.Spider):
@@ -9,83 +7,54 @@ class NumberSpider(scrapy.Spider):
     allowed_domains = ['hongkonglotto.com']
     start_urls = ['https://hongkonglotto.com/update-loadball']
 
-    def open_spider(self, spider):
-        """Open database connection when the spider starts."""
-        logging.info("Opening database connection...")
-        try:
-            # Use environment variables for credentials (ScrapeOps typically uses env vars)
-            host = os.getenv('DB_HOST', 'localhost')  # Default to localhost, but can be overridden in ScrapeOps
-            user = os.getenv('DB_USER', 'public_admin')
-            password = os.getenv('DB_PASSWORD', 'Publicadmin123#')
-            database = os.getenv('DB_NAME', 'hongkong')
+    def __init__(self):
+        self.connection = pymysql.connect(
+            host='localhost',  # e.g., 'localhost' or IP address of the MySQL server
+            user='public_admin',  # Your MySQL username
+            password='Publicadmin123#',  # Your MySQL password
+            database='hongkong',  # The name of the database
+            charset='utf8mb4',
+            cursorclass=pymysql.cursors.DictCursor
+        )
+        self.cursor = self.connection.cursor()
 
-            # Try to establish the database connection
-            self.connection = pymysql.connect(
-                host=host,  
-                user=user,  
-                password=password,  
-                database=database,  
-                charset='utf8mb4',
-                cursorclass=pymysql.cursors.DictCursor
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS keluaran (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                date DATE,
+                first TEXT,
+                second TEXT,
+                third TEXT
             )
-
-            # Initialize cursor after successful connection
-            self.cursor = self.connection.cursor()
-
-            # Create the table if it doesn't exist
-            self.cursor.execute('''
-                CREATE TABLE IF NOT EXISTS keluaran (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    date DATETIME,
-                    first TEXT,
-                    second TEXT,
-                    third TEXT
-                )
-            ''')
-            self.connection.commit()
-            logging.info("Database connection and table setup successful.")
-        except Exception as e:
-            logging.error(f"Error setting up database connection: {e}")
-            raise
-        
-        if not hasattr(self, 'cursor'):
-            logging.error("Cursor initialization failed.")
-        else:
-            logging.info("Cursor initialized successfully.")
+        ''')
+        self.connection.commit()
 
     def parse(self, response):
-        logging.info("Parsing response...")
         first_place_numbers = []
         second_place_numbers = []
         third_place_numbers = []
 
-        # Extract data for first, second, and third places
         for first in response.css('div[data-id="2526:6087"]'):
             first_place = first.css('div.frame-42234')
             number_1 = first_place.css('img::attr(alt)').getall()
-            clean_number1 = [n.replace("Property 1=", "").replace(",", "") for n in number_1]  # Clean commas
+            clean_number1 = [n.replace("Property 1=", "") for n in number_1]
             first_place_numbers = clean_number1
 
         for second in response.css('div[data-id="2526:6088"]'):
             second_place = second.css('div.frame-42234')
             number_2 = second_place.css('img::attr(alt)').getall()
-            clean_number2 = [n.replace("Property 1=", "").replace(",", "") for n in number_2]  # Clean commas
+            clean_number2 = [n.replace("Property 1=", "") for n in number_2]
             second_place_numbers = clean_number2
 
         for third in response.css('div[data-id="2526:6106"]'):
             third_place = third.css('div.frame-42234')
             number_3 = third_place.css('img::attr(alt)').getall()
-            clean_number3 = [n.replace("Property 1=", "").replace(",", "") for n in number_3]  # Clean commas
+            clean_number3 = [n.replace("Property 1=", "") for n in number_3]
             third_place_numbers = clean_number3
 
-        current_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        current_date = datetime.now().strftime('%Y-%m-%d')
 
-        # Ensure save_to_db is only called after the cursor has been initialized
-        if hasattr(self, 'cursor'):
-            logging.info("Saving data to database...")
-            self.save_to_db(current_date, first_place_numbers, second_place_numbers, third_place_numbers)
-        else:
-            logging.error("Cursor is not initialized. Skipping save_to_db.")
+        self.save_to_db(current_date, first_place_numbers, second_place_numbers, third_place_numbers)
 
         yield {
             'keluaran': {
@@ -97,28 +66,16 @@ class NumberSpider(scrapy.Spider):
         }
 
     def save_to_db(self, date, first, second, third):
-        """Save scraped data to the MySQL database."""
-        try:
-            # Remove commas from each element, then join into strings
-            first_str = ' '.join([f.replace(",", "") for f in first])
-            second_str = ' '.join([s.replace(",", "") for s in second])
-            third_str = ' '.join([t.replace(",", "") for t in third])
+        first_str = ', '.join(first)
+        second_str = ', '.join(second)
+        third_str = ', '.join(third)
 
-            # Insert the data into the MySQL table
-            self.cursor.execute('''
-                INSERT INTO keluaran (date, first, second, third)
-                VALUES (%s, %s, %s, %s)
-            ''', (date, first_str, second_str, third_str))
-            self.connection.commit()
-            logging.info("Data saved to database successfully.")
-        except Exception as e:
-            logging.error(f"Error saving data to database: {e}")
 
-    def close_spider(self, spider):
-        """Close the database connection when the spider finishes."""
-        logging.info("Closing database connection...")
-        try:
-            self.connection.close()
-            logging.info("Database connection closed successfully.")
-        except Exception as e:
-            logging.error(f"Error closing database connection: {e}")
+        self.cursor.execute('''
+            INSERT INTO keluaran (date, first, second, third)
+            VALUES (%s, %s, %s, %s)
+        ''', (date, first_str, second_str, third_str))
+        self.connection.commit()
+
+    def close(self, reason):
+        self.connection.close()
