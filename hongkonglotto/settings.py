@@ -12,6 +12,7 @@ BOT_NAME = "hongkonglotto"
 SPIDER_MODULES = ["hongkonglotto.spiders"]
 NEWSPIDER_MODULE = "hongkonglotto.spiders"
 
+LOG_LEVEL = 'INFO'
 
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
